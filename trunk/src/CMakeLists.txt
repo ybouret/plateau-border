@@ -1,0 +1,18 @@
+CMAKE_MINIMUM_REQUIRED(VERSION 2.6)
+PROJECT(plateau-border)
+
+IF(WIN32)
+	SET(YROOT "E:/program/yocto4/sdk")
+ELSE()
+	SET(YROOT $ENV{HOME}/program/yocto4/sdk)
+ENDIF()
+
+MESSAGE( STATUS "YROOT=${YROOT}")
+INCLUDE( ${YROOT}/share/yocto/rules.cmake )
+INCLUDE_DIRECTORIES( ${YROOT}/include )
+LINK_DIRECTORIES(    ${YROOT}/lib     )
+
+SET(CMAKE_INSTALL_PREFIX ${PROJECT_SOURCE_DIR}/../sdk)
+
+ADD_SUBDIRECTORY(spatio)
+
