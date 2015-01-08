@@ -6,13 +6,22 @@
 #include "yocto/ptr/auto.hpp"
 #include "yocto/gfx/ops/blob.hpp"
 #include "yocto/gfx/ops/hist.hpp"
+#include "yocto/gfx/ops/contrast.hpp"
+#include "yocto/gfx/ops/blob.hpp"
 
 using namespace yocto;
 using namespace gfx;
 
-static inline void put_rgb_dup(void *addr, const rgba_t &c, const void *)
+static inline void put_rgb(void *addr, const rgba_t &c, const void *) throw()
 {
-    
+    new (addr) rgb_t(c.r,c.g,c.b);
+}
+
+static inline rgba_t float2rgba(const void *addr,const void *) throw()
+{
+    const float   f = *(const float *)addr;
+    const uint8_t u = conv::to_byte(f);
+    return rgba_t(u,u,u,0xff);
 }
 
 int main(int argc, char *argv[] )
@@ -34,8 +43,13 @@ int main(int argc, char *argv[] )
         IMG.declare( new png_format()  );
         IMG.declare( new jpeg_format() );
         
-        // scan input directory
+        
         vfs & fs = local_fs::instance();
+        
+        // create output dir
+        fs.create_sub_dir(outdir);
+        
+        // scan input directory
         auto_ptr<vfs::scanner> scan( fs.new_scanner( inpdir ) );
         for( const vfs::entry *ep = scan->next(); ep; ep = scan->next() )
         {
@@ -52,8 +66,30 @@ int main(int argc, char *argv[] )
             const string &path = ep->path;
             std::cerr << "loading " << path << std::endl;
             
-            const bitmap::pointer bmp( IMG.load(path,3,put_rgb_dup,NULL));
+            // load image and convert to greyscale
+            const bitmap::pointer bmp(IMG.load(path,3,put_rgb,NULL));
             pixmap3               img(bmp,NULL);
+            pixmapf               pgs(img,rgb2gsf<rgba_t>);
+            pixmapf               mask(pgs.w,pgs.h);
+           
+            // enhance contrast
+            maximum_contrast(pgs);
+
+            // threshold
+            histogram H;
+            H.compute_from(pgs);
+            const size_t t = H.threshold();
+            threshold::apply(mask,t,pgs, threshold::keep_black);
+            
+            //cluster
+            clusters cls;
+            
+            //blob
+            blob(mask,cls,true);
+            
+            const string outname = outdir + ep->base_name;
+            std::cerr << "\tsaving to " << outname << std::endl;
+            IMG["PNG"].save(outname, mask,float2rgba,NULL,NULL);
             
         }
 
