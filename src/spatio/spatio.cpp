@@ -22,7 +22,7 @@ static inline void put_rgb(void *addr, const rgba_t &c, const void *) throw()
 static inline rgba_t float2rgba(const void *addr,const void *) throw()
 {
     const float   f = *(const float *)addr;
-    const uint8_t u = conv::to_byte(f);
+    const uint8_t u = conv::to_byte(1.0f-f);
     return rgba_t(u,u,u,0xff);
 }
 
@@ -98,9 +98,17 @@ namespace
                 for(size_t i=2;i<=w;++i)
                 {
                     {
-                        if( S[i].lo < lo ) lo = S[i].lo;
-                            if( S[i].hi > hi ) hi = S[i].hi;
-                                }
+                        if( S[i].lo < lo )
+                        {
+                            lo = S[i].lo;
+                        }
+                        
+                        
+                        if( S[i].hi > hi )
+                        {
+                            hi = S[i].hi;
+                        }
+                    }
                 }
             }
         }
@@ -223,7 +231,6 @@ int main(int argc, char *argv[] )
                 pS->push_back(s);
             }
             
-            //if(work.size()>10) break;
         }
         
         
