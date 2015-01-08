@@ -24,6 +24,22 @@ static inline rgba_t float2rgba(const void *addr,const void *) throw()
     return rgba_t(u,u,u,0xff);
 }
 
+static inline rgba_t get_rgba_from_blob(const void *addr, const void *args)
+{
+    const size_t  value = *(const size_t *)addr;
+    if(value<=0)
+    {
+        return rgba_t(0,0,0);
+    }
+    else
+    {
+        const size_t  level = *(const size_t *)args;
+        const uint8_t u     = (level == value) ? 0xff : 0x00;
+        return rgba_t(u,u,u);
+    }
+}
+
+
 int main(int argc, char *argv[] )
 {
     const char *prog = vfs::get_base_name(argv[0]);
@@ -85,11 +101,31 @@ int main(int argc, char *argv[] )
             clusters cls;
             
             //blob
-            blob(mask,cls,true);
+            blob B(mask,cls,true);
+            cls.sort();
+            std::cerr << "\t#cluster=" << cls.size() << std::endl;
             
-            const string outname = outdir + ep->base_name;
+            
+            
+            string outname = outdir + ep->base_name;
+            vfs::change_extension(outname, "png");
             std::cerr << "\tsaving to " << outname << std::endl;
-            IMG["PNG"].save(outname, mask,float2rgba,NULL,NULL);
+            //IMG["PNG"].save(outname, mask,float2rgba,NULL,NULL);
+            size_t level = 0;
+            if(cls.size()>0)
+            {
+                level = cls.front()->uuid;
+            }
+            IMG["PNG"].save(outname, B,get_rgba_from_blob,&level,NULL);
+
+#if 0
+            for(clusters::iterator i=cls.begin(); i != cls.end(); ++i)
+            {
+                std::cerr << "\t\t" << (*i)->size << std::endl;
+            }
+            if(cls.size()>1)
+                break;
+#endif
             
         }
 
