@@ -50,25 +50,25 @@ namespace
         const unit_t lo;
         const unit_t hi;
         const unit_t count;
-        
+
         inline slice( const unit_t __lo, const unit_t __hi ) throw() :
         lo(__lo),
         hi(__hi),
         count(hi-lo+1)
         {
         }
-        
+
         inline ~slice() throw() {}
-        
+
         inline slice(const slice &s ) throw() : lo(s.lo), hi(s.hi), count(s.count) {}
-        
-        
+
+
     private:
         YOCTO_DISABLE_ASSIGN(slice);
     };
-    
-    
-    
+
+
+
     class slices : public vector<slice>, public counted
     {
     public:
@@ -77,15 +77,15 @@ namespace
         explicit slices(size_t w) : vector<slice>(w,as_capacity), lo(0),hi(0)
         {
         }
-        
+
         virtual ~slices() throw()
         {
         }
-        
+
         typedef arc_ptr<slices> ptr;
-        
-        
-        
+
+
+
         void bracket() throw()
         {
             lo = hi = 0;
@@ -102,8 +102,8 @@ namespace
                         {
                             lo = S[i].lo;
                         }
-                        
-                        
+
+
                         if( S[i].hi > hi )
                         {
                             hi = S[i].hi;
@@ -112,12 +112,14 @@ namespace
                 }
             }
         }
-        
+
     private:
         YOCTO_DISABLE_COPY_AND_ASSIGN(slices);
     };
-    
+
 }
+
+#include "yocto/string/conv.hpp"
 
 int main(int argc, char *argv[] )
 {
@@ -125,31 +127,55 @@ int main(int argc, char *argv[] )
     try
     {
         if(argc<=3)
-            throw exception("usage: %s directory extensions output_directory",prog);
-        
+            throw exception("usage: %s directory extensions output_directory [xmin xmax]",prog);
+
         const string savext = "png";
         string       inpdir = argv[1];
         string       imgext = argv[2];
         string       outdir = argv[3];
+        unit_t       xmin   = 0;
+        if(argc>4)
+        {
+            xmin = strconv::to_int(argv[4],"xmin");
+        }
+        unit_t       xmax = -1;
+        if(argc>5)
+        {
+            xmax = strconv::to_int(argv[5],"xmax");
+        }
         vfs::as_directory(inpdir);
         vfs::as_directory(outdir);
+        std::cerr << "Input  Dir=" << inpdir << std::endl;
+        std::cerr << "Output Dir=" << outdir << std::endl;
         imgext.to_lower();
-        
+
         image &IMG = image::instance();
         IMG.declare( new png_format()  );
         IMG.declare( new jpeg_format() );
-        
-        
+
+
         vfs & fs = local_fs::instance();
-        
+
+        std::cerr << "xmin=" << xmin << std::endl;
+        std::cerr << "xmax=" << xmax << std::endl;
+
+        xmin = max_of<unit_t>(xmin,0);
+        if(xmax>=0)
+        {
+            if(xmax<xmin)
+            {
+                throw exception("xmax<xmin");
+            }
+        }
+
         // create output dir
-        fs.create_sub_dir(outdir);
+        fs.create_dir(outdir,true);
         fs.remove_files_with_extension_in(outdir, savext);
-        
+
         // scan input directory
         auto_ptr<vfs::scanner> scan( fs.new_scanner( inpdir ) );
         vector<slices::ptr>    work(1024,as_capacity);
-        
+
         for( const vfs::entry *ep = scan->next(); ep; ep = scan->next() )
         {
             if(ep->is_directory())
@@ -161,48 +187,48 @@ int main(int argc, char *argv[] )
             ext_str.to_lower();
             if(ext_str!=imgext)
                 continue;
-            
+
             const string &path = ep->path;
             std::cerr << "loading " << path << std::endl;
-            
+
             // load image and convert to greyscale
             const bitmap::pointer bmp(IMG.load(path,3,put_rgb,NULL));
             pixmap3               img(bmp,NULL);
             pixmapf               pgs(img,rgb2gsf<rgba_t>);
             pixmapf               mask(pgs.w,pgs.h);
-            
+
             // enhance contrast
             maximum_contrast(pgs);
-            
+
             // threshold
             histogram H;
             H.compute_from(pgs);
             const size_t t = H.threshold();
             threshold::apply(mask,t,pgs, threshold::keep_black);
-            
+
             //cluster
             clusters cls;
-            
+
             //blob
             blob B(mask,cls,true);
             cls.sort();
             std::cerr << "\t#cluster=" << cls.size() << std::endl;
-            
-            
-            
+
+
+
             string outname = outdir + ep->base_name;
             vfs::change_extension(outname,savext);
             std::cerr << "\tsaving to " << outname << std::endl;
-            
+
             //IMG["PNG"].save(outname, mask,float2rgba,NULL,NULL);
-            
+
             size_t level = 0;
             if(cls.size()>0)
             {
                 level = cls.front()->uuid;
             }
             IMG["PNG"].save(outname, B,get_rgba_from_blob,&level,NULL);
-            
+
             const size_t w = mask.w;
             if(work.size()>0 && work.back()->size() != w )
             {
@@ -211,29 +237,39 @@ int main(int argc, char *argv[] )
             const unit_t h = mask.h;
             slices::ptr pS( new slices(w) );
             work.push_back(pS);
+
+            unit_t x_ini = xmin;
+            unit_t x_end = (xmax>=0) ? min_of<unit_t>(xmax,w) : w;
+            x_ini = min_of<unit_t>(x_end,x_ini);
+
             for(unit_t x=0;x<w;++x)
             {
                 unit_t lo=0;
-                for(;lo<h;++lo)
-                {
-                    if(mask[lo][x]>0)
-                        break;
-                }
-                
                 unit_t hi=h;
-                for(--hi;hi>=0;--hi)
+                if(x>=x_ini&&x<x_end)
                 {
-                    if(mask[hi][x]>0)
-                        break;
+                    for(;lo<h;++lo)
+                    {
+                        if(mask[lo][x]>0)
+                            break;
+                    }
+
+
+                    for(--hi;hi>=0;--hi)
+                    {
+                        if(mask[hi][x]>0)
+                            break;
+                    }
+
                 }
-                
+
                 const slice s(lo,hi);
                 pS->push_back(s);
             }
-            
+
         }
-        
-        
+
+
         const size_t n = work.size();
         std::cerr << "Analyzing " << n << " slices" << std::endl;
         if(n>0)
@@ -251,12 +287,12 @@ int main(int argc, char *argv[] )
             }
             std::cerr << "lower=" << lo << std::endl;
             std::cerr << "upper=" << hi << std::endl;
-            
+
             if(lo>hi)
             {
                 throw exception("no data was found...");
             }
-            
+
             const unit_t scale  = hi-lo+1;
             const size_t width  = work[1]->size();
             pixmapf      spatio(width,n);
