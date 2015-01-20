@@ -86,27 +86,30 @@ namespace
 
 
 
-        void bracket() throw()
+        void bracket(const unit_t xmin, const unit_t xmax) throw()
         {
             lo = hi = 0;
             const size_t w = size();
             if(w>0)
             {
+                assert(xmin>=0);
+                assert(xmax>=xmin);
+                assert(xmax<w);
                 const array<slice> &S = *this;
-                lo = S[1].lo;
-                hi = S[1].hi;
-                for(size_t i=2;i<=w;++i)
+                lo = S[xmin+1].lo;
+                hi = S[xmin+1].hi;
+                for(unit_t i=xmin+1,ip=xmin+2;i<=xmax;++i,++ip)
                 {
                     {
-                        if( S[i].lo < lo )
+                        if( S[ip].lo < lo )
                         {
-                            lo = S[i].lo;
+                            lo = S[ip].lo;
                         }
 
 
-                        if( S[i].hi > hi )
+                        if( S[ip].hi > hi )
                         {
-                            hi = S[i].hi;
+                            hi = S[ip].hi;
                         }
                     }
                 }
@@ -238,35 +241,30 @@ int main(int argc, char *argv[] )
             slices::ptr pS( new slices(w) );
             work.push_back(pS);
 
-            unit_t x_ini = xmin;
-            unit_t x_end = (xmax>=0) ? min_of<unit_t>(xmax,w) : w;
-            x_ini = min_of<unit_t>(x_end,x_ini);
 
             for(unit_t x=0;x<w;++x)
             {
                 unit_t lo=0;
                 unit_t hi=h;
-                if(x>=x_ini&&x<x_end)
+                for(;lo<h;++lo)
                 {
-                    for(;lo<h;++lo)
-                    {
-                        if(mask[lo][x]>0)
-                            break;
-                    }
-
-
-                    for(--hi;hi>=0;--hi)
-                    {
-                        if(mask[hi][x]>0)
-                            break;
-                    }
-
+                    if(mask[lo][x]>0)
+                        break;
                 }
+
+
+                for(--hi;hi>=0;--hi)
+                {
+                    if(mask[hi][x]>0)
+                        break;
+                }
+
 
                 const slice s(lo,hi);
                 pS->push_back(s);
             }
 
+            // if(work.size()>=100)  break;
         }
 
 
@@ -274,10 +272,21 @@ int main(int argc, char *argv[] )
         std::cerr << "Analyzing " << n << " slices" << std::endl;
         if(n>0)
         {
+            unit_t width  = work[1]->size();
+            if(xmax<0||xmax>=width-1) xmax = width-1;
+            if(xmin>xmax)             xmin = xmax;
+
+            assert(xmin>=0);
+            assert(xmax<width);
+            assert(xmin<=xmax);
+
+            std::cerr << "\txmin=" << xmin <<", xmax=" << xmax << std::endl;
             for(size_t i=1;i<=n;++i)
             {
-                work[i]->bracket();
+                work[i]->bracket(xmin,xmax);
             }
+
+
             unit_t lo = work[1]->lo;
             unit_t hi = work[1]->hi;
             for(size_t i=2;i<=n;++i)
@@ -293,14 +302,14 @@ int main(int argc, char *argv[] )
                 throw exception("no data was found...");
             }
 
+            const unit_t length = xmax-xmin+1;
             const unit_t scale  = hi-lo+1;
-            const size_t width  = work[1]->size();
-            pixmapf      spatio(width,n);
+            pixmapf      spatio(length,n);
             for(size_t j=1;j<=n;++j)
             {
                 pixmapf::row &sp = spatio[j-1];
                 const slices &sl = *work[j];
-                for(size_t i=1,im=0;i<=width;++i,++im)
+                for(unit_t im=xmin,i=xmin+1;im<=xmax;++i,++im)
                 {
                     const slice &s = sl[i];
                     if(s.count>0)
@@ -309,7 +318,7 @@ int main(int argc, char *argv[] )
                     }
                 }
             }
-            
+
             {
                 const string outname = "spation.png";
                 IMG["PNG"].save(outname, spatio,float2rgba,NULL,NULL);
