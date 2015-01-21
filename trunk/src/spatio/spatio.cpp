@@ -51,7 +51,6 @@ namespace
         const unit_t lo;
         const unit_t hi;
         const unit_t count;
-
         inline slice( const unit_t __lo, const unit_t __hi ) throw() :
         lo(__lo),
         hi(__hi),
@@ -61,7 +60,9 @@ namespace
 
         inline ~slice() throw() {}
 
-        inline slice(const slice &s ) throw() : lo(s.lo), hi(s.hi), count(s.count) {}
+        inline slice(const slice &s ) throw() : lo(s.lo), hi(s.hi), count(s.count)
+        {
+        }
 
 
     private:
@@ -75,7 +76,11 @@ namespace
     public:
         unit_t lo;
         unit_t hi;
-        explicit slices(size_t w) : vector<slice>(w,as_capacity), lo(0),hi(0)
+        const size_t width;
+        const size_t height;
+        explicit slices(size_t w,size_t h) : vector<slice>(w,as_capacity), lo(0),hi(0),
+        width(w),
+        height(h)
         {
         }
 
@@ -257,7 +262,7 @@ int main(int argc, char *argv[] )
 
 
             // convert image to a set of slices
-            slices::ptr pS( new slices(w) );
+            slices::ptr pS( new slices(w,h) );
 
             // that we add to the current set
             work.push_back(pS);
@@ -285,7 +290,7 @@ int main(int argc, char *argv[] )
                 pS->push_back(s);
             }
 
-            if(work.size()>=50)
+            if(work.size()>=100)
                 break;
 
 
@@ -310,20 +315,35 @@ int main(int argc, char *argv[] )
             const size_t num_pop_back  = width - (xmax+1);
             const size_t num_pop_front = xmin;
             const size_t length        = xmax+1-xmin;
-            for(size_t i=1;i<=n;++i)
+            for(size_t I=1;I<=n;++I)
             {
-                slices::ptr &pS = work[i];
+                slices::ptr &pS = work[I];
                 for(size_t k=num_pop_back; k>0;--k) pS->pop_back();
                 for(size_t k=num_pop_front;k>0;--k) pS->pop_front();
                 assert(pS->size() == length );
 
-                const string outname = outdir + vformat("shape%08u.dat",unsigned(i));
+#if 0
+                const string outname = outdir + vformat("shape%08u.dat",unsigned(I));
                 ios::ocstream fp(outname,false);
                 for(size_t k=1;k<=length;++k)
                 {
                     const slice &s = (*pS)[k];
                     fp("%u %u %u\n",unsigned(k),unsigned(s.lo),unsigned(s.hi));
                 }
+#endif
+                const size_t h = work[1]->height;
+
+                pixmapf shape(length,h);
+                for(size_t i=0;i<length;++i)
+                {
+                    const slice &s = (*pS)[i+1];
+                    shape[s.lo][i] = 1.0f;
+                    shape[s.hi][i] = 1.0f;
+                }
+
+                const string outname = outdir + vformat("shape%08u.png",unsigned(I));
+                IMG["PNG"].save(outname, shape,float2rgba,NULL,NULL);
+
             }
 
 
