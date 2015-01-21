@@ -10,6 +10,7 @@
 #include "yocto/gfx/ops/blob.hpp"
 #include "yocto/ptr/arc.hpp"
 #include "yocto/sequence/vector.hpp"
+#include "yocto/ios/ocstream.hpp"
 
 using namespace yocto;
 using namespace gfx;
@@ -203,13 +204,13 @@ int main(int argc, char *argv[] )
             // enhance contrast
             maximum_contrast(pgs);
 
-            // threshold
+            // automatic thresholding...
             histogram H;
             H.compute_from(pgs);
             const size_t t = H.threshold();
             threshold::apply(mask,t,pgs, threshold::keep_black);
 
-            //cluster
+            //clustering
             clusters cls;
 
             //blob
@@ -223,25 +224,45 @@ int main(int argc, char *argv[] )
             vfs::change_extension(outname,savext);
             std::cerr << "\tsaving to " << outname << std::endl;
 
-            //IMG["PNG"].save(outname, mask,float2rgba,NULL,NULL);
 
             size_t level = 0;
             if(cls.size()>0)
             {
                 level = cls.front()->uuid;
             }
-            IMG["PNG"].save(outname, B,get_rgba_from_blob,&level,NULL);
+            //IMG["PNG"].save(outname, B,get_rgba_from_blob,&level,NULL);
 
             const size_t w = mask.w;
             if(work.size()>0 && work.back()->size() != w )
             {
                 throw exception("width mismatch for '%s'", ep->base_name);
             }
+
+            // update mask
             const unit_t h = mask.h;
+            for(size_t j=0;j<h;++j)
+            {
+                pixmapf::row    &mj = mask[j];
+                const blob::row &bj = B[j];
+                for(size_t i=0;i<w;++i)
+                {
+                    if(bj[i]!=level)
+                    {
+                        mj[i] = 0.0f;
+                    }
+                }
+            }
+
+            IMG["PNG"].save(outname, mask,float2rgba,NULL,NULL);
+
+
+            // convert image to a set of slices
             slices::ptr pS( new slices(w) );
+
+            // that we add to the current set
             work.push_back(pS);
 
-
+            // scan every slice, using the computed mask
             for(unit_t x=0;x<w;++x)
             {
                 unit_t lo=0;
@@ -264,12 +285,51 @@ int main(int argc, char *argv[] )
                 pS->push_back(s);
             }
 
-            // if(work.size()>=100)  break;
+            if(work.size()>=50)
+                break;
+
+
         }
 
 
         const size_t n = work.size();
         std::cerr << "Analyzing " << n << " slices" << std::endl;
+
+        if(n>0)
+        {
+            unit_t width  = work[1]->size();
+            if(xmax<0||xmax>=width-1) xmax = width-1;
+            if(xmin>xmax)             xmin = xmax;
+
+            assert(xmin>=0);
+            assert(xmax<width);
+            assert(xmin<=xmax);
+
+            std::cerr << "\txmin=" << xmin <<", xmax=" << xmax << std::endl;
+
+            const size_t num_pop_back  = width - (xmax+1);
+            const size_t num_pop_front = xmin;
+            const size_t length        = xmax+1-xmin;
+            for(size_t i=1;i<=n;++i)
+            {
+                slices::ptr &pS = work[i];
+                for(size_t k=num_pop_back; k>0;--k) pS->pop_back();
+                for(size_t k=num_pop_front;k>0;--k) pS->pop_front();
+                assert(pS->size() == length );
+
+                const string outname = outdir + vformat("shape%08u.dat",unsigned(i));
+                ios::ocstream fp(outname,false);
+                for(size_t k=1;k<=length;++k)
+                {
+                    const slice &s = (*pS)[k];
+                    fp("%u %u %u\n",unsigned(k),unsigned(s.lo),unsigned(s.hi));
+                }
+            }
+
+
+        }
+
+#if 0
         if(n>0)
         {
             unit_t width  = work[1]->size();
@@ -325,7 +385,7 @@ int main(int argc, char *argv[] )
             }
             
         }
-        
+#endif
         
         return 0;
     }
