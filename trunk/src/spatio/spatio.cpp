@@ -290,7 +290,7 @@ int main(int argc, char *argv[] )
                 pS->push_back(s);
             }
 
-            if(work.size()>=100)
+            if(work.size()>=200)
                 break;
 
 
@@ -334,11 +334,17 @@ int main(int argc, char *argv[] )
                 const size_t h = work[1]->height;
 
                 pixmapf shape(length,h);
+                const unit_t hm = h/2;
                 for(size_t i=0;i<length;++i)
                 {
                     const slice &s = (*pS)[i+1];
-                    shape[s.lo][i] = 1.0f;
-                    shape[s.hi][i] = 1.0f;
+                    const unit_t delta = s.count;
+                    const unit_t z_lo  = hm - delta/2;
+                    const unit_t z_hi  = hm + delta/2-1;
+                    if(z_lo>=0)
+                        shape[z_lo][i] = 1.0f;
+                    if(z_hi<h)
+                        shape[z_hi][i] = 1.0f;
                 }
 
                 const string outname = outdir + vformat("shape%08u.png",unsigned(I));
@@ -398,7 +404,7 @@ int main(int argc, char *argv[] )
                     }
                 }
             }
-
+            
             {
                 const string outname = "spation.png";
                 IMG["PNG"].save(outname, spatio,float2rgba,NULL,NULL);
