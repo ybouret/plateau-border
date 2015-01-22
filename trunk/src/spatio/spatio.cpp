@@ -24,6 +24,7 @@ static inline rgba_t float2rgba(const void *addr,const void *) throw()
 {
     const float   f = *(const float *)addr;
     const uint8_t u = conv::to_byte(1.0f-f);
+    //const uint8_t u = conv::to_byte(f);
     return rgba_t(u,u,u,0xff);
 }
 
@@ -290,8 +291,7 @@ int main(int argc, char *argv[] )
                 pS->push_back(s);
             }
 
-            if(work.size()>=200)
-                break;
+            // if(work.size()>=200) break;
 
 
         }
