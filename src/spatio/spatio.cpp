@@ -202,7 +202,7 @@ int main(int argc, char *argv[] )
             std::cerr << "loading " << path << std::endl;
 
             // load image and convert to greyscale
-            const bitmap::pointer bmp(IMG.load(path,3,put_rgb,NULL));
+            const bitmap::pointer bmp(IMG.load(path,3,put_rgb,NULL,NULL));
             pixmap3               img(bmp,NULL);
             pixmapf               pgs(img,rgb2gsf<rgba_t>);
             pixmapf               mask(pgs.w,pgs.h);
@@ -345,6 +345,7 @@ int main(int argc, char *argv[] )
                         shape[z_lo][i] = 1.0f;
                     if(z_hi<h)
                         shape[z_hi][i] = 1.0f;
+                    
                 }
 
                 const string outname = outdir + vformat("shape%08u.png",unsigned(I));
@@ -355,64 +356,7 @@ int main(int argc, char *argv[] )
 
         }
 
-#if 0
-        if(n>0)
-        {
-            unit_t width  = work[1]->size();
-            if(xmax<0||xmax>=width-1) xmax = width-1;
-            if(xmin>xmax)             xmin = xmax;
 
-            assert(xmin>=0);
-            assert(xmax<width);
-            assert(xmin<=xmax);
-
-            std::cerr << "\txmin=" << xmin <<", xmax=" << xmax << std::endl;
-            for(size_t i=1;i<=n;++i)
-            {
-                work[i]->bracket(xmin,xmax);
-            }
-
-
-            unit_t lo = work[1]->lo;
-            unit_t hi = work[1]->hi;
-            for(size_t i=2;i<=n;++i)
-            {
-                if(work[i]->lo<lo) lo = work[i]->lo;
-                if(work[i]->hi>hi) hi = work[i]->hi;
-            }
-            std::cerr << "lower=" << lo << std::endl;
-            std::cerr << "upper=" << hi << std::endl;
-
-            if(lo>hi)
-            {
-                throw exception("no data was found...");
-            }
-
-            const unit_t length = xmax-xmin+1;
-            const unit_t scale  = hi-lo+1;
-            pixmapf      spatio(length,n);
-            for(size_t j=1;j<=n;++j)
-            {
-                pixmapf::row &sp = spatio[j-1];
-                const slices &sl = *work[j];
-                for(unit_t im=xmin,i=xmin+1;im<=xmax;++i,++im)
-                {
-                    const slice &s = sl[i];
-                    if(s.count>0)
-                    {
-                        sp[im] = float(s.count)/scale;
-                    }
-                }
-            }
-            
-            {
-                const string outname = "spation.png";
-                IMG["PNG"].save(outname, spatio,float2rgba,NULL,NULL);
-            }
-            
-        }
-#endif
-        
         return 0;
     }
     catch(const exception &e)
