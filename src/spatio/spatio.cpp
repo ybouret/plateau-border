@@ -30,19 +30,12 @@ static inline rgba_t float2rgba(const void *addr,const void *) throw()
     return rgba_t(u,u,u,0xff);
 }
 
-static inline rgba_t get_rgba_from_blob(const void *addr, const void *args)
+static inline rgba_t intensity2rgba(const void *addr,const void *) throw()
 {
-    const size_t  value = *(const size_t *)addr;
-    if(value<=0)
-    {
-        return rgba_t(0,0,0);
-    }
-    else
-    {
-        const size_t  level = *(const size_t *)args;
-        const uint8_t u     = (level == value) ? 0xff : 0x00;
-        return rgba_t(u,u,u);
-    }
+    const float   f = *(const float *)addr;
+    const uint8_t u = conv::to_byte(f);
+    //const uint8_t u = conv::to_byte(f);
+    return rgba_t(u,u,u,0xff);
 }
 
 
@@ -81,8 +74,8 @@ namespace
         unit_t hi;
         const size_t width;
         const size_t height;
-        vector<double> x;
-        vector<double> y;
+        vector<float> x;
+        vector<float> y;
         explicit slices(size_t w,size_t h) : vector<slice>(w,as_capacity), lo(0),hi(0),
         width(w),
         height(h),
@@ -136,6 +129,11 @@ namespace
 }
 
 #include "yocto/string/conv.hpp"
+
+static inline float Sech( float x )
+{
+    return 1.0/Square(coshf(x));
+}
 
 int main(int argc, char *argv[] )
 {
@@ -299,7 +297,7 @@ int main(int argc, char *argv[] )
                 pS->y[x+1] = s.count;
             }
 
-            if(work.size()>=10) break;
+            //if(work.size()>=100) break;
 
 
         }
@@ -323,11 +321,16 @@ int main(int argc, char *argv[] )
             const size_t num_pop_back  = width - (xmax+1);
             const size_t num_pop_front = xmin;
             const size_t length        = xmax+1-xmin;
-            vector<double> shift(length,0);
-            vector<double> scale(length,0);
-            matrix<double> W;
+            vector<float> shift(length,0);
+            vector<float> scale(length,0);
+            matrix<float> W;
+            //numeric<float>::function Psi( cfunctor(wavelet<double>::Gaussian) );
+            numeric<float>::function Psi( cfunctor(Sech) );
+            pixmap<float> Wimg(length,length);
             for(size_t I=1;I<=n;++I)
             {
+                std::cerr << ".";
+                std::cerr.flush();
                 slices::ptr &pS = work[I];
                 for(size_t k=num_pop_back; k>0;--k) { pS->pop_back();  pS->x.pop_back();  pS->y.pop_back();  }
                 for(size_t k=num_pop_front;k>0;--k) { pS->pop_front(); pS->y.pop_front(); pS->y.pop_front(); }
@@ -356,9 +359,9 @@ int main(int argc, char *argv[] )
                         shape[z_lo][i] = 1.0f;
                     if(z_hi<h)
                         shape[z_hi][i] = 1.0f;
-                    
+
                 }
-                
+
                 {
                     const string outname = outdir + vformat("shape%08u.png",unsigned(I));
                     IMG["PNG"].save(outname, shape,float2rgba,NULL,NULL);
@@ -375,13 +378,40 @@ int main(int argc, char *argv[] )
                 }
 
                 //Wavelet matrix
-                wavelet<double>::cwt(pS->x, pS->y, Psi, shift, scale, W);
+                wavelet<float>::cwt(pS->x, pS->y, Psi, shift, scale, W);
+                float wlo = W[1][1];
+                wlo *= wlo;
+                float whi = wlo;
+                for(size_t i=1;i<=length;++i)
+                {
+                    for(size_t j=1;j<=length;++j)
+                    {
+                        float tmp = W[i][j]; tmp *= tmp;
+                        if(tmp>whi) whi = tmp;
+                        if(tmp<wlo) wlo = tmp;
+                    }
+                }
+
+                const float factor = 1.0f/(whi-wlo);
+                for(size_t j=1;j<=length;++j)
+                {
+                    for(size_t i=1;i<=length;++i)
+                    {
+                        float tmp = W[i][j]; tmp *= tmp;
+                        Wimg[j-1][i-1] = clamp<float>(0,(tmp-wlo)*factor,1);
+                    }
+                }
+
+                {
+                    const string outname = outdir + vformat("w%08u.png",unsigned(I));
+                    IMG["PNG"].save(outname, Wimg,intensity2rgba,NULL,NULL);
+                }
             }
-            
-            
+            std::cerr << std::endl;
+
         }
-        
-        
+
+
         return 0;
     }
     catch(const exception &e)
