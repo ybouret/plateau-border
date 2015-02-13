@@ -11,9 +11,11 @@
 #include "yocto/ptr/arc.hpp"
 #include "yocto/sequence/vector.hpp"
 #include "yocto/ios/ocstream.hpp"
+#include "yocto/math/wavelet/cwt.hpp"
 
 using namespace yocto;
 using namespace gfx;
+using namespace math;
 
 static inline void put_rgb(void *addr, const rgba_t &c, const void *) throw()
 {
@@ -79,9 +81,13 @@ namespace
         unit_t hi;
         const size_t width;
         const size_t height;
+        vector<double> x;
+        vector<double> y;
         explicit slices(size_t w,size_t h) : vector<slice>(w,as_capacity), lo(0),hi(0),
         width(w),
-        height(h)
+        height(h),
+        x(w,0),
+        y(w,0)
         {
         }
 
@@ -289,9 +295,11 @@ int main(int argc, char *argv[] )
 
                 const slice s(lo,hi);
                 pS->push_back(s);
+                pS->x[x+1] = x+1;
+                pS->y[x+1] = s.count;
             }
 
-            // if(work.size()>=200) break;
+            if(work.size()>=10) break;
 
 
         }
@@ -315,11 +323,14 @@ int main(int argc, char *argv[] )
             const size_t num_pop_back  = width - (xmax+1);
             const size_t num_pop_front = xmin;
             const size_t length        = xmax+1-xmin;
+            vector<double> shift(length,0);
+            vector<double> scale(length,0);
+            matrix<double> W;
             for(size_t I=1;I<=n;++I)
             {
                 slices::ptr &pS = work[I];
-                for(size_t k=num_pop_back; k>0;--k) pS->pop_back();
-                for(size_t k=num_pop_front;k>0;--k) pS->pop_front();
+                for(size_t k=num_pop_back; k>0;--k) { pS->pop_back();  pS->x.pop_back();  pS->y.pop_back();  }
+                for(size_t k=num_pop_front;k>0;--k) { pS->pop_front(); pS->y.pop_front(); pS->y.pop_front(); }
                 assert(pS->size() == length );
 
 #if 0
@@ -347,16 +358,30 @@ int main(int argc, char *argv[] )
                         shape[z_hi][i] = 1.0f;
                     
                 }
+                
+                {
+                    const string outname = outdir + vformat("shape%08u.png",unsigned(I));
+                    IMG["PNG"].save(outname, shape,float2rgba,NULL,NULL);
+                }
 
-                const string outname = outdir + vformat("shape%08u.png",unsigned(I));
-                IMG["PNG"].save(outname, shape,float2rgba,NULL,NULL);
+                if(false)
+                {
+                    const string outname = outdir + vformat("xy%08u.dat",unsigned(I));
+                    ios::ocstream fp(outname,false);
+                    for(size_t i=1;i<=length;++i)
+                    {
+                        fp("%g %g\n", pS->x[i], pS->y[i]);
+                    }
+                }
 
+                //Wavelet matrix
+                wavelet<double>::cwt(pS->x, pS->y, Psi, shift, scale, W);
             }
-
-
+            
+            
         }
-
-
+        
+        
         return 0;
     }
     catch(const exception &e)
