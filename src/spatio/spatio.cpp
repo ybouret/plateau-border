@@ -92,48 +92,105 @@ namespace
 
 
 
-        void bracket(const unit_t xmin, const unit_t xmax) throw()
+    private:
+        YOCTO_DISABLE_COPY_AND_ASSIGN(slices);
+    };
+
+    static inline float Sech( float x )
+    {
+        return 1.0f/Square(coshf(x));
+    }
+
+    class ParaWork
+    {
+    public:
+        const slices &S;
+        lockable     &access;
+        const size_t  job_id;
+        const string &outdir;
+
+        explicit ParaWork(const slices &user_slices,
+                          lockable     &user_access,
+                          const size_t  user_job_id,
+                          const string &user_outdir) :
+        S(user_slices),
+        access(user_access),
+        job_id(user_job_id),
+        outdir(user_outdir)
         {
-            lo = hi = 0;
-            const size_t w = size();
-            if(w>0)
+        }
+
+        ParaWork( const ParaWork &other ) throw() :
+        S(other.S),
+        access(other.access),
+        job_id(other.job_id),
+        outdir(other.outdir)
+        {
+        }
+
+        inline void operator()(void)
+        {
+            const size_t n = S.size();
+            vector<float>    shifts(n,0);
+            vector<float>    scales(n,0);
+            matrix<float>    W;
+            numeric<float>::function Psi( cfunctor(Sech) );
             {
-                assert(xmin>=0);
-                assert(xmax>=xmin);
-                assert(xmax<w);
-                const array<slice> &S = *this;
-                lo = S[xmin+1].lo;
-                hi = S[xmin+1].hi;
-                for(unit_t i=xmin+1,ip=xmin+2;i<=xmax;++i,++ip)
+                scoped_lock guard(access);
+                std::cerr << ".[" << job_id << "]";
+                std::cerr.flush();
+            }
+            wavelet<float>::cwt(S.x, S.y, Psi, shifts, scales, W);
+
+            image & IMG = image::instance();
+            pixmap<float> Wimg(n,n);
+
+            float wlo = W[1][1];
+            wlo *= wlo;
+            float whi = wlo;
+            for(size_t i=1;i<=n;++i)
+            {
+                for(size_t j=1;j<=n;++j)
                 {
-                    {
-                        if( S[ip].lo < lo )
-                        {
-                            lo = S[ip].lo;
-                        }
-
-
-                        if( S[ip].hi > hi )
-                        {
-                            hi = S[ip].hi;
-                        }
-                    }
+                    float tmp = W[i][j]; tmp *= tmp;
+                    if(tmp>whi) whi = tmp;
+                    if(tmp<wlo) wlo = tmp;
                 }
             }
+
+            const float factor = 1.0f/(whi-wlo);
+            for(size_t j=1;j<=n;++j)
+            {
+                for(size_t i=1;i<=n;++i)
+                {
+                    float tmp = W[i][j]; tmp *= tmp;
+                    Wimg[j-1][i-1] = clamp<float>(0,(tmp-wlo)*factor,1);
+                }
+            }
+
+
+            {
+                const string outname = outdir + vformat("w%08u.png",unsigned(job_id));
+                IMG["PNG"].save(outname, Wimg,intensity2rgba,NULL,NULL);
+            }
+
+
+        }
+
+        ~ParaWork() throw()
+        {
+
         }
 
     private:
-        YOCTO_DISABLE_COPY_AND_ASSIGN(slices);
+        YOCTO_DISABLE_ASSIGN(ParaWork);
     };
 
 }
 
 #include "yocto/string/conv.hpp"
+#include "yocto/threading/server.hpp"
 
-static inline float Sech( float x )
-{
-    return 1.0/Square(coshf(x));
-}
 
 int main(int argc, char *argv[] )
 {
@@ -297,7 +354,7 @@ int main(int argc, char *argv[] )
                 pS->y[x+1] = s.count;
             }
 
-            //if(work.size()>=100) break;
+            //if(work.size()>=20) break;
 
 
         }
@@ -318,33 +375,17 @@ int main(int argc, char *argv[] )
 
             std::cerr << "\txmin=" << xmin <<", xmax=" << xmax << std::endl;
 
+            std::cerr << "Computing Shapes..." << std::endl;
             const size_t num_pop_back  = width - (xmax+1);
             const size_t num_pop_front = xmin;
             const size_t length        = xmax+1-xmin;
-            vector<float> shift(length,0);
-            vector<float> scale(length,0);
-            matrix<float> W;
-            //numeric<float>::function Psi( cfunctor(wavelet<double>::Gaussian) );
-            numeric<float>::function Psi( cfunctor(Sech) );
-            pixmap<float> Wimg(length,length);
             for(size_t I=1;I<=n;++I)
             {
-                std::cerr << ".";
                 std::cerr.flush();
                 slices::ptr &pS = work[I];
                 for(size_t k=num_pop_back; k>0;--k) { pS->pop_back();  pS->x.pop_back();  pS->y.pop_back();  }
                 for(size_t k=num_pop_front;k>0;--k) { pS->pop_front(); pS->y.pop_front(); pS->y.pop_front(); }
                 assert(pS->size() == length );
-
-#if 0
-                const string outname = outdir + vformat("shape%08u.dat",unsigned(I));
-                ios::ocstream fp(outname,false);
-                for(size_t k=1;k<=length;++k)
-                {
-                    const slice &s = (*pS)[k];
-                    fp("%u %u %u\n",unsigned(k),unsigned(s.lo),unsigned(s.hi));
-                }
-#endif
                 const size_t h = work[1]->height;
 
                 pixmapf shape(length,h);
@@ -367,15 +408,34 @@ int main(int argc, char *argv[] )
                     IMG["PNG"].save(outname, shape,float2rgba,NULL,NULL);
                 }
 
-                if(false)
-                {
-                    const string outname = outdir + vformat("xy%08u.dat",unsigned(I));
-                    ios::ocstream fp(outname,false);
-                    for(size_t i=1;i<=length;++i)
-                    {
-                        fp("%g %g\n", pS->x[i], pS->y[i]);
-                    }
-                }
+            }
+
+            std::cerr << "Computing Wavelets..." << std::endl;
+            threading::server srv;
+            for(size_t I=1;I<=n;++I)
+            {
+                const ParaWork Job( * work[I], srv.access, I, outdir);
+                srv.enqueue(Job);
+            }
+            {
+                srv.flush();
+            }
+            std::cerr << std::endl << std::endl;
+
+#if 0
+            std::cerr << "Wavelet transforms...." << std::endl;
+            vector<float> shift(length,0);
+            vector<float> scale(length,0);
+            matrix<float> W;
+            numeric<float>::function Psi( cfunctor(Sech) );
+            pixmap<float> Wimg(length,length);
+            for(size_t I=1;I<=n;++I)
+            {
+                std::cerr << ".";
+                std::cerr.flush();
+                slices::ptr &pS = work[I];
+                assert(pS->size() == length );
+
 
                 //Wavelet matrix
                 wavelet<float>::cwt(pS->x, pS->y, Psi, shift, scale, W);
@@ -406,8 +466,10 @@ int main(int argc, char *argv[] )
                     const string outname = outdir + vformat("w%08u.png",unsigned(I));
                     IMG["PNG"].save(outname, Wimg,intensity2rgba,NULL,NULL);
                 }
+
             }
             std::cerr << std::endl;
+#endif
 
         }
 
