@@ -7,7 +7,6 @@
 #include "yocto/gfx/ops/blob.hpp"
 #include "yocto/gfx/ops/hist.hpp"
 #include "yocto/gfx/ops/contrast.hpp"
-#include "yocto/gfx/ops/blob.hpp"
 #include "yocto/ptr/arc.hpp"
 #include "yocto/sequence/vector.hpp"
 #include "yocto/ios/ocstream.hpp"
@@ -265,7 +264,7 @@ int main(int argc, char *argv[] )
             // load image and convert to greyscale
             const bitmap::pointer bmp(IMG.load(path,3,put_rgb,NULL,NULL));
             pixmap3               img(bmp,NULL);
-            pixmapf               pgs(img,rgb2gsf<rgba_t>);
+            pixmapf               pgs(img,rgb2gsf<rgb_t>);
             pixmapf               mask(pgs.w,pgs.h);
 
             // enhance contrast
