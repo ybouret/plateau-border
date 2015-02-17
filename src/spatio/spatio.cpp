@@ -29,7 +29,7 @@ static inline rgba_t float2rgba(const void *addr,const void *) throw()
     //const uint8_t u = conv::to_byte(f);
     return rgba_t(u,u,u,0xff);
 }
-
+/*
 static inline rgba_t intensity2rgba(const void *addr,const void *) throw()
 {
     const float   f = *(const float *)addr;
@@ -37,7 +37,7 @@ static inline rgba_t intensity2rgba(const void *addr,const void *) throw()
     //const uint8_t u = conv::to_byte(f);
     return rgba_t(u,u,u,0xff);
 }
-
+*/
 
 namespace
 {
@@ -171,7 +171,7 @@ namespace
 
             {
                 const string outname = outdir + vformat("w%08u.png",unsigned(job_id));
-                IMG["PNG"].save(outname, Wimg,intensity2rgba,NULL,NULL);
+                IMG["PNG"].save(outname, Wimg,image::get_rampf,NULL,NULL);
             }
 
 
@@ -354,7 +354,7 @@ int main(int argc, char *argv[] )
                 pS->y[x+1] = s.count;
             }
 
-            //if(work.size()>=20) break;
+            //if(work.size()>=100) break;
 
 
         }
@@ -464,7 +464,7 @@ int main(int argc, char *argv[] )
 
                 {
                     const string outname = outdir + vformat("w%08u.png",unsigned(I));
-                    IMG["PNG"].save(outname, Wimg,intensity2rgba,NULL,NULL);
+                    IMG["PNG"].save(outname, Wimg,image::get_gsf,NULL,NULL);
                 }
 
             }
