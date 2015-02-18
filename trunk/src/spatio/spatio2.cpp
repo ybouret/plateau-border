@@ -197,7 +197,7 @@ public:
             vector<double> scales(n,0);
             matrix<double> W;
             wavelet<double>::cwt(frame.x, frame.y, Psi, shifts, scales, W);
-            wavelet<double>::compact(W);
+            wavelet<double>::rescale(W);
 
             string outname = frame.outdir + "w_" + frame.epname;
             vfs::change_extension(outname, frame.savext);
@@ -213,8 +213,17 @@ public:
             {
                 for(size_t j=1;j<=n;++j)
                 {
-                    const double w = W[i][j];
-                    const rgb_t  C = rgb_t::make_ramp(w, 0, 1);
+                    const float w(W[i][j]);
+                    rgb_t C;
+                    if(w>=0)
+                    {
+                        C.r = conv::to_byte(w);
+                    }
+                    else
+                    {
+                        C.g = conv::to_byte(-w);
+                    }
+                    //const rgb_t  C = rgb_t::make_ramp(w, 0, 1);
                     res[(j-1)+offset][(i-1)+frame.xmin] = C;
                 }
             }
