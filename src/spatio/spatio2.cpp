@@ -125,11 +125,32 @@ public:
         }
 
         const image &IMG = image::instance();
-        string outname = outdir + epname;
-        vfs::change_extension(outname, savext);
-        std::cerr << "\tsaving to " << outname << std::endl;
-        IMG["PNG"].save(outname,mask, image::get_rampf, NULL, NULL);
+        {
+            string outname = outdir + epname;
+            vfs::change_extension(outname, savext);
+            std::cerr << "\tsaving to " << outname << std::endl;
+            IMG["PNG"].save(outname,mask, image::get_rampf, NULL, NULL);
+        }
 
+        if(true)
+        {
+            pixmapf shape(w,h);
+            for(size_t i=1;i<=w;++i)
+            {
+                const unit_t thickness = y[i];
+                const unit_t ylo = h/2 - thickness/2;
+                const unit_t yhi = h/2 + thickness/2;
+                shape[yhi][i-1] = 1.0f;
+                shape[ylo][i-1] = 1.0f;
+            }
+
+            {
+                string outname = outdir + "shape" + epname;
+                vfs::change_extension(outname, savext);
+                std::cerr << "\tsaving to " << outname << std::endl;
+                IMG["PNG"].save(outname,shape, image::get_gsf, NULL, NULL);
+            }
+        }
     }
 
     virtual ~Frame() throw()
@@ -351,6 +372,8 @@ YOCTO_PROGRAM_START()
 
     }
 
+    //return 0;
+    
     const size_t num_frames = frames.size();
     if(num_frames>0)
     {
