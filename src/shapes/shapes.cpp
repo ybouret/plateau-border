@@ -108,6 +108,8 @@ YOCTO_PROGRAM_START()
         //______________________________________________________________________
         vector<double> xx(w,as_capacity);
         vector<double> yy(w,as_capacity);
+        vector<double> yu(w,as_capacity);
+        vector<double> yd(w,as_capacity);
 
         for(unit_t i=0;i<w;++i)
         {
@@ -133,6 +135,8 @@ YOCTO_PROGRAM_START()
                 }
             }
             surf[jmax][i] = named_color::get("blue");
+            yd.push_back(jmin);
+            yu.push_back(jmax);
             yy.push_back(jmax-jmin);
             xx.push_back(i);
         }
@@ -145,6 +149,11 @@ YOCTO_PROGRAM_START()
             }
         }
 
+        //______________________________________________________________________
+        //
+        // scan..
+        //______________________________________________________________________
+        
         vector<double> yf(w);
 
         Soliton              soliton;
@@ -161,11 +170,23 @@ YOCTO_PROGRAM_START()
 
         samples.prepare(nv);
 
+        unit_t imin = 1;
+        double vmin = yy[1];
+        for(unit_t i=2;i<=w;++i)
+        {
+            const double tmp = yy[i];
+            if(tmp<vmin)
+            {
+                imin=i;
+                vmin=tmp;
+            }
+        }
+
         aorg[1] = yy[1];
         aorg[2] = (yy[w]-yy[1])/double(w);
-        aorg[3] = (aorg[1] + w*aorg[2]/2) - yy[w/2];
+        aorg[3] = (aorg[1] + imin*aorg[2]) - vmin;
         aorg[4] = 1; //4.0/w;
-        aorg[5] = w/2;
+        aorg[5] = imin;
 
 
         std::cerr << "level-1" << std::endl;
