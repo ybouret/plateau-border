@@ -6,9 +6,46 @@
 
 #include "yocto/program.hpp"
 #include "yocto/ios/ocstream.hpp"
+#include "yocto/math/fit/lsf.hpp"
+
 
 using namespace yocto;
 using namespace graphics;
+using namespace math;
+
+namespace
+{
+    class Soliton
+    {
+    public:
+        explicit Soliton()
+        {
+        }
+
+        virtual ~Soliton() throw()
+        {
+
+        }
+
+        inline double Eval( double x, const array<double> &a )
+        {
+            assert(a.size()>=5);
+            const double args = a[4]*(x-a[5]);
+            const double csha = cosh(args);
+            return a[1] + x*a[2] - a[3]/(csha*csha);
+        }
+
+
+        inline bool ToDo(LeastSquares<double>::Function       &F,
+                         const LeastSquares<double>::Samples  &S)
+        {
+            return true;
+        }
+
+    private:
+        YOCTO_DISABLE_COPY_AND_ASSIGN(Soliton);
+    };
+}
 
 YOCTO_PROGRAM_START()
 {
@@ -19,7 +56,7 @@ YOCTO_PROGRAM_START()
     IMG.declare( new png_format()  );
     IMG.declare( new jpeg_format() );
     IMG.declare( new tiff_format() );
-    
+
     const image::format &PNG = IMG["PNG"];
     histogram          H;
     histogram::patches hp;
@@ -69,7 +106,8 @@ YOCTO_PROGRAM_START()
         //
         // scan..
         //______________________________________________________________________
-        vector<unit_t> thick(w,as_capacity);
+        vector<double> xx(w,as_capacity);
+        vector<double> yy(w,as_capacity);
 
         for(unit_t i=0;i<w;++i)
         {
@@ -95,16 +133,94 @@ YOCTO_PROGRAM_START()
                 }
             }
             surf[jmax][i] = named_color::get("blue");
-            thick.push_back(jmax-jmin);
+            yy.push_back(jmax-jmin);
+            xx.push_back(i);
         }
         PNG.save("surf.png",surf,NULL);
         {
             ios::wcstream fp("thick.dat");
             for(unit_t i=1;i<=w;++i)
             {
-                fp("%ld %ld\n", long(i-1), long(thick[i]));
+                fp("%g %g\n", xx[i], (yy[i]));
             }
         }
+
+        vector<double> yf(w);
+
+        Soliton              soliton;
+        LeastSquares<double> Fit;
+        LeastSquares<double>::Function F(  &soliton, & Soliton::Eval );
+        LeastSquares<double>::Callback CB( &soliton, & Soliton::ToDo );
+        LeastSquares<double>::Samples  samples;
+        samples.append(xx, yy, yf);
+
+        const size_t   nv = 5;
+        vector<double> aorg(nv,0);
+        vector<bool>   used(nv,false);
+        vector<double> aerr(nv,0);
+
+        samples.prepare(nv);
+
+        aorg[1] = yy[1];
+        aorg[2] = (yy[w]-yy[1])/double(w);
+        aorg[3] = (aorg[1] + w*aorg[2]/2) - yy[w/2];
+        aorg[4] = 1; //4.0/w;
+        aorg[5] = w/2;
+
+
+        std::cerr << "level-1" << std::endl;
+        used[4] = true;
+        if(!Fit(samples,F,aorg,used,aerr,&CB))
+        {
+            std::cerr << "couldn't fit level-1" << std::endl;
+            continue;
+        }
+
+
+        Fit.display(std::cerr, aorg, aerr);
+        {
+            ios::wcstream fp("f1.dat");
+            for(unit_t i=1;i<=w;++i)
+            {
+                fp("%g %g\n", xx[i], yf[i]);
+            }
+        }
+
+        std::cerr << "level-2" << std::endl;
+        used[3] = used[5] = true;
+        if(!Fit(samples,F,aorg,used,aerr,&CB))
+        {
+            std::cerr << "couldn't fit level-2" << std::endl;
+            continue;
+        }
+        Fit.display(std::cerr, aorg, aerr);
+        {
+            ios::wcstream fp("f2.dat");
+            for(unit_t i=1;i<=w;++i)
+            {
+                fp("%g %g\n", xx[i], yf[i]);
+            }
+        }
+
+        std::cerr << "level-3" << std::endl;
+        used[1]=used[2] = true;
+        if(!Fit(samples,F,aorg,used,aerr,&CB))
+        {
+            std::cerr << "couldn't fit level-2" << std::endl;
+            continue;
+        }
+        Fit.display(std::cerr, aorg, aerr);
+        {
+            ios::wcstream fp("f3.dat");
+            for(unit_t i=1;i<=w;++i)
+            {
+                fp("%g %g\n", xx[i], yf[i]);
+            }
+        }
+
+
+
+
     }
     
 }
