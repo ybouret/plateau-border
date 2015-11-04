@@ -252,7 +252,8 @@ YOCTO_PROGRAM_START()
         used[4] = true;
         used[5] = true;
         
-        
+
+        std::cerr << "LEVEL 1" << std::endl;
         if(!Fit(samples,F,aorg,used,aerr,&cb))
         {
             std::cerr << "Couldn't Fit Level-1" << std::endl;
@@ -266,9 +267,26 @@ YOCTO_PROGRAM_START()
                  fp("%g %g %g %g %g\n", xx[i], yy[i], ym[i], fy[i], fm[i]);
             }
         }
-        
-        
-        
+
+        for(size_t i=1;i<=gvar;++i) used[i] = true;
+
+
+        if(!Fit(samples,F,aorg,used,aerr,&cb))
+        {
+            std::cerr << "Couldn't Fit Level-2" << std::endl;
+        }
+
+        std::cerr << "LEVEL 2" << std::endl;
+        Fit.display(std::cerr, aorg, aerr);
+        {
+            ios::wcstream fp("f2.dat");
+            for(size_t i=1;i<=n;++i)
+            {
+                fp("%g %g %g %g %g\n", xx[i], yy[i], ym[i], fy[i], fm[i]);
+            }
+        }
+
+
     }
     
 }
