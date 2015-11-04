@@ -99,7 +99,7 @@ YOCTO_PROGRAM_START()
             throw exception("not one blob...");
         }
 
-        pixmap3 surf(target);
+        pixmap3 surf(source);
         //B.transfer(1, surf, source);
 
         //______________________________________________________________________
@@ -236,6 +236,18 @@ YOCTO_PROGRAM_START()
             for(unit_t i=1;i<=w;++i)
             {
                 fp("%g %g\n", xx[i], yf[i]);
+            }
+        }
+
+        {
+            ios::wcstream fp("fit.dat");
+            for(unit_t i=1;i<=w;++i)
+            {
+                const double mid = yd[i] + yu[i];
+                const double del = yf[i];
+                const double ymax = 0.5*(mid+del);
+                const double ymin = 0.5*(mid-del);
+                fp("%g %g %g %g %g\n", xx[i], yd[i], yu[i], ymin, ymax);
             }
         }
 
