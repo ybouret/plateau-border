@@ -64,6 +64,7 @@ YOCTO_PROGRAM_START()
     for(int arg=1;arg<argc;++arg)
     {
         const string  filename = argv[arg];
+        std::cerr << "Processing " << filename << std::endl;
         const pixmap3 source( IMG.load3(filename,NULL) );
         const unit_t  w = source.w;
         const unit_t  h = source.h;
@@ -152,17 +153,17 @@ YOCTO_PROGRAM_START()
         //______________________________________________________________________
         const size_t n      = w;
         const double width  = xx[n]-xx[1];
-        const double aLeft  = yy[1];
-        const double aRight = yy[n];
-        const double aSlope = (aRight-aLeft)/width;
-        const double mLeft  = ym[1];
-        const double mRight = ym[n];
-        const double mSlope = (mRight-mLeft)/width;
+        const double _yLeft  = yy[1];
+        const double _yRight = yy[n];
+        const double _ySlope = (_yRight-_yLeft)/width;
+        const double _mLeft  = ym[1];
+        const double _mRight = ym[n];
+        const double _mSlope = (_mRight-_mLeft)/width;
 
-        std::cerr << aLeft << "+(" << aSlope << ")*x, " << mLeft << "+(" << mSlope << ")*x" << std::endl;
+        std::cerr << _yLeft << "+(" << _ySlope << ")*x, " << _mLeft << "+(" << _mSlope << ")*x" << std::endl;
 
         size_t imin=1;
-        double vmin=aLeft;
+        double vmin= _yLeft;
         for(size_t i=2;i<=n;++i)
         {
             const double tmp = yy[i];
@@ -172,7 +173,8 @@ YOCTO_PROGRAM_START()
                 vmin = tmp;
             }
         }
-
+        const double xmin = xx[imin];
+        
         {
             ios::wcstream fp("profile.dat");
             for(size_t i=1;i<=n;++i)
@@ -193,21 +195,80 @@ YOCTO_PROGRAM_START()
         Soliton soliton;
         LeastSquares<double>::Function F(  &soliton, & Soliton::Eval );
         LeastSquares<double>::Callback cb( &soliton, & Soliton::ToDo );
-
+        LeastSquares<double> Fit;
+        
         //______________________________________________________________________
         //
         // Preparing all variables
         //______________________________________________________________________
         const size_t nvar = 5; //!< variables for one curve
-        const size_t gvar = 2*nvar - 1;
+        const size_t gvar = 8; //!< 2*5 -2 shared variables
 
         samples.prepare(nvar,gvar);
 
         vector<double> aorg(gvar);
         double &yStart = aorg[1];
         double &ySlope = aorg[2];
+        double &yAmpli = aorg[3];
+        double &yScale = aorg[4];
+        double &yShift = aorg[5];
         
+        //double &mScale = aorg[4]; //!< same scaling
+        //double &mShift = aorg[5]; //!< same shift
+        
+        double &mStart = aorg[6]; //!< start
+        double &mSlope = aorg[7];
+        double &mAmpli = aorg[8];
 
+        
+        // link global to local
+        pY->connect(1, 1);
+        pY->connect(2, 2);
+        pY->connect(3, 3);
+        pY->connect(4, 4);
+        pY->connect(5, 5);
+
+        
+        pM->connect(1,6);
+        pM->connect(2,7);
+        pM->connect(3,8);
+        pM->connect(4,4);
+        pM->connect(5,5);
+        
+        // initialize values
+        yStart = _yLeft;
+        ySlope = _ySlope;
+        yAmpli = (yStart + xmin * ySlope) - yy[imin];
+        yScale = 1;
+        yShift = xmin;
+        
+        mStart = _mLeft;
+        mSlope = _mSlope;
+        mAmpli = (mStart+xmin*mSlope) - ym[imin];
+        
+        vector<bool>   used(gvar,false);
+        vector<double> aerr(gvar);
+        used[3] = true;
+        used[4] = true;
+        used[5] = true;
+        
+        
+        if(!Fit(samples,F,aorg,used,aerr,&cb))
+        {
+            std::cerr << "Couldn't Fit Level-1" << std::endl;
+        }
+        
+        Fit.display(std::cerr, aorg, aerr);
+        {
+            ios::wcstream fp("f1.dat");
+            for(size_t i=1;i<=n;++i)
+            {
+                 fp("%g %g %g %g %g\n", xx[i], yy[i], ym[i], fy[i], fm[i]);
+            }
+        }
+        
+        
+        
     }
     
 }
