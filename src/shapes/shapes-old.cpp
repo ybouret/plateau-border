@@ -99,6 +99,9 @@ YOCTO_PROGRAM_START()
             throw exception("not one blob...");
         }
 
+        pixmap3 surf(source);
+        //B.transfer(1, surf, source);
+
         //______________________________________________________________________
         //
         // scan..
@@ -107,9 +110,7 @@ YOCTO_PROGRAM_START()
         vector<double> yy(w,as_capacity);
         vector<double> yu(w,as_capacity);
         vector<double> yd(w,as_capacity);
-        vector<double> ym(w,as_capacity);
 
-        pixmap3 surf(source);
         for(unit_t i=0;i<w;++i)
         {
             unit_t jmin = 0;
@@ -134,52 +135,122 @@ YOCTO_PROGRAM_START()
                 }
             }
             surf[jmax][i] = named_color::get("blue");
-
             yd.push_back(jmin);
             yu.push_back(jmax);
             yy.push_back(jmax-jmin);
-            ym.push_back(0.5*(yu.back()+yd.back()));
             xx.push_back(i);
-
-            surf[unit_t(ym.back())][i] = named_color::get("green");
         }
-
         PNG.save("surf.png",surf,NULL);
+        {
+            ios::wcstream fp("thick.dat");
+            for(unit_t i=1;i<=w;++i)
+            {
+                fp("%g %g\n", xx[i], (yy[i]));
+            }
+        }
 
         //______________________________________________________________________
         //
-        // analyze
+        // scan..
         //______________________________________________________________________
-        const size_t n      = w;
-        const double width  = xx[n]-xx[1];
-        const double aLeft  = yy[1];
-        const double aRight = yy[n];
-        const double aSlope = (aRight-aLeft)/width;
-        const double mLeft  = ym[1];
-        const double mRight = ym[n];
-        const double mSlope = (mRight-mLeft)/width;
+        
+        vector<double> yf(w);
 
-        std::cerr << aLeft << "+(" << aSlope << ")*x, " << mLeft << "+(" << mSlope << ")*x" << std::endl;
+        Soliton              soliton;
+        LeastSquares<double> Fit;
+        LeastSquares<double>::Function F(  &soliton, & Soliton::Eval );
+        LeastSquares<double>::Callback CB( &soliton, & Soliton::ToDo );
+        LeastSquares<double>::Samples  samples;
+        samples.append(xx, yy, yf);
 
-        size_t imin=1;
-        double vmin=aLeft;
-        for(size_t i=2;i<=n;++i)
+        const size_t   nv = 5;
+        vector<double> aorg(nv,0);
+        vector<bool>   used(nv,false);
+        vector<double> aerr(nv,0);
+
+        samples.prepare(nv);
+
+        unit_t imin = 1;
+        double vmin = yy[1];
+        for(unit_t i=2;i<=w;++i)
         {
             const double tmp = yy[i];
             if(tmp<vmin)
             {
-                imin = i;
-                vmin = tmp;
+                imin=i;
+                vmin=tmp;
+            }
+        }
+
+        aorg[1] = yy[1];
+        aorg[2] = (yy[w]-yy[1])/double(w);
+        aorg[3] = (aorg[1] + imin*aorg[2]) - vmin;
+        aorg[4] = 1; //4.0/w;
+        aorg[5] = imin;
+
+
+        std::cerr << "level-1" << std::endl;
+        used[4] = true;
+        if(!Fit(samples,F,aorg,used,aerr,&CB))
+        {
+            std::cerr << "couldn't fit level-1" << std::endl;
+            continue;
+        }
+
+
+        Fit.display(std::cerr, aorg, aerr);
+        {
+            ios::wcstream fp("f1.dat");
+            for(unit_t i=1;i<=w;++i)
+            {
+                fp("%g %g\n", xx[i], yf[i]);
+            }
+        }
+
+        std::cerr << "level-2" << std::endl;
+        used[3] = used[5] = true;
+        if(!Fit(samples,F,aorg,used,aerr,&CB))
+        {
+            std::cerr << "couldn't fit level-2" << std::endl;
+            continue;
+        }
+        Fit.display(std::cerr, aorg, aerr);
+        {
+            ios::wcstream fp("f2.dat");
+            for(unit_t i=1;i<=w;++i)
+            {
+                fp("%g %g\n", xx[i], yf[i]);
+            }
+        }
+
+        std::cerr << "level-3" << std::endl;
+        used[1]=used[2] = true;
+        if(!Fit(samples,F,aorg,used,aerr,&CB))
+        {
+            std::cerr << "couldn't fit level-2" << std::endl;
+            continue;
+        }
+        Fit.display(std::cerr, aorg, aerr);
+        {
+            ios::wcstream fp("f3.dat");
+            for(unit_t i=1;i<=w;++i)
+            {
+                fp("%g %g\n", xx[i], yf[i]);
             }
         }
 
         {
-            ios::wcstream fp("profile.dat");
-            for(size_t i=1;i<=n;++i)
+            ios::wcstream fp("fit.dat");
+            for(unit_t i=1;i<=w;++i)
             {
-                fp("%g %g %g\n", xx[i], yy[i], ym[i]);
+                const double mid = yd[i] + yu[i];
+                const double del = yf[i];
+                const double ymax = 0.5*(mid+del);
+                const double ymin = 0.5*(mid-del);
+                fp("%g %g %g %g %g\n", xx[i], yd[i], yu[i], ymin, ymax);
             }
         }
+
 
 
 
