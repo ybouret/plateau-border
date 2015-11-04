@@ -181,7 +181,32 @@ YOCTO_PROGRAM_START()
             }
         }
 
+        vector<double> fy(n), fm(n);
 
+        LeastSquares<double>::Samples samples;
+        LeastSquares<double>::Sample::Pointer pY( new   LeastSquares<double>::Sample(xx,yy,fy) );
+        LeastSquares<double>::Sample::Pointer pM( new   LeastSquares<double>::Sample(xx,ym,fm) );
+
+        samples.push_back(pY);
+        samples.push_back(pM);
+
+        Soliton soliton;
+        LeastSquares<double>::Function F(  &soliton, & Soliton::Eval );
+        LeastSquares<double>::Callback cb( &soliton, & Soliton::ToDo );
+
+        //______________________________________________________________________
+        //
+        // Preparing all variables
+        //______________________________________________________________________
+        const size_t nvar = 5; //!< variables for one curve
+        const size_t gvar = 2*nvar - 1;
+
+        samples.prepare(nvar,gvar);
+
+        vector<double> aorg(gvar);
+        double &yStart = aorg[1];
+        double &ySlope = aorg[2];
+        
 
     }
     
