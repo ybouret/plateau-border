@@ -326,15 +326,18 @@ YOCTO_PROGRAM_START()
             std::cerr << "invalid shape!" << std::endl;
             continue;
         }
-        const double  am = (thickness-squeeze)/thickness;
-        std::cerr << "am=" << am << std::endl;
+        const double am      = (thickness-squeeze)/thickness;
         const double scaling = fabs(uCoeff) * thickness;
+        const double beta    = (1.0-am)/(4*scaling*scaling);
+        std::cerr << "am     =" << am << std::endl;
         std::cerr << "scaling=" << scaling << std::endl;
+        std::cerr << "beta   =" << beta << std::endl;
         {
             ios::acstream fp("scaling.dat");
             fp("#%s\n", outname.c_str());
-            fp("%g %g\n", am, scaling);
+            fp("%g %g %g\n", am, scaling, beta);
         }
+
     }
 
 }
