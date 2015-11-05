@@ -3,6 +3,7 @@
 #include "yocto/graphics/image/png.hpp"
 #include "yocto/graphics/image/tiff.hpp"
 #include "yocto/graphics/ops/hist.hpp"
+#include "yocto/math/core/tao.hpp"
 
 #include "yocto/program.hpp"
 #include "yocto/ios/ocstream.hpp"
@@ -39,6 +40,7 @@ namespace
         inline bool ToDo(LeastSquares<double>::Function       &F,
                          const LeastSquares<double>::Samples  &S)
         {
+            //std::cerr << "Fitting..." << std::endl;
             return true;
         }
 
@@ -105,10 +107,9 @@ YOCTO_PROGRAM_START()
         // scan..
         //______________________________________________________________________
         vector<double> xx(w,as_capacity);
-        vector<double> yy(w,as_capacity);
-        vector<double> yu(w,as_capacity);
-        vector<double> yd(w,as_capacity);
-        vector<double> ym(w,as_capacity);
+        vector<double> yu(w,as_capacity); //! up value
+        vector<double> yd(w,as_capacity); //! down value
+        vector<double> ya(w,as_capacity); //! amplitude
 
         pixmap3 surf(source);
         for(unit_t i=0;i<w;++i)
@@ -138,11 +139,9 @@ YOCTO_PROGRAM_START()
 
             yd.push_back(jmin);
             yu.push_back(jmax);
-            yy.push_back(jmax-jmin);
-            ym.push_back(0.5*(yu.back()+yd.back()));
+            ya.push_back(jmax-jmin);
             xx.push_back(i);
 
-            surf[unit_t(ym.back())][i] = named_color::get("green");
         }
 
         PNG.save("surf.png",surf,NULL);
@@ -152,21 +151,13 @@ YOCTO_PROGRAM_START()
         // analyze
         //______________________________________________________________________
         const size_t n      = w;
-        const double width  = xx[n]-xx[1];
-        const double _yLeft  = yy[1];
-        const double _yRight = yy[n];
-        const double _ySlope = (_yRight-_yLeft)/width;
-        const double _mLeft  = ym[1];
-        const double _mRight = ym[n];
-        const double _mSlope = (_mRight-_mLeft)/width;
 
-        std::cerr << _yLeft << "+(" << _ySlope << ")*x, " << _mLeft << "+(" << _mSlope << ")*x" << std::endl;
 
-        size_t imin=1;
-        double vmin= _yLeft;
+        size_t imin= 1;
+        double vmin= ya[1];
         for(size_t i=2;i<=n;++i)
         {
-            const double tmp = yy[i];
+            const double tmp = ya[i];
             if(tmp<vmin)
             {
                 imin = i;
@@ -179,115 +170,137 @@ YOCTO_PROGRAM_START()
             ios::wcstream fp("profile.dat");
             for(size_t i=1;i<=n;++i)
             {
-                fp("%g %g %g\n", xx[i], yy[i], ym[i]);
+                fp("%g %g %g\n", xx[i], yd[i], yu[i]);
             }
         }
 
-        vector<double> fy(n), fm(n);
+        vector<double> fu(n), fd(n);
 
         LeastSquares<double>::Samples samples;
-        LeastSquares<double>::Sample::Pointer pY( new   LeastSquares<double>::Sample(xx,yy,fy) );
-        LeastSquares<double>::Sample::Pointer pM( new   LeastSquares<double>::Sample(xx,ym,fm) );
+        LeastSquares<double>::Sample::Pointer su( new   LeastSquares<double>::Sample(xx,yu,fu) );
+        LeastSquares<double>::Sample::Pointer sd( new   LeastSquares<double>::Sample(xx,yd,fd) );
 
-        samples.push_back(pY);
-        samples.push_back(pM);
+        samples.push_back(su);
+        samples.push_back(sd);
 
         Soliton soliton;
         LeastSquares<double>::Function F(  &soliton, & Soliton::Eval );
         LeastSquares<double>::Callback cb( &soliton, & Soliton::ToDo );
         LeastSquares<double> Fit;
-        
-        //______________________________________________________________________
-        //
-        // Preparing all variables
-        //______________________________________________________________________
-        const size_t nvar = 5; //!< variables for one curve
-        const size_t gvar = 8; //!< 2*5 -2 shared variables
 
+
+        const size_t   gvar = 8;
+        const size_t   nvar = 5;
         samples.prepare(nvar,gvar);
 
         vector<double> aorg(gvar);
-        double &yStart = aorg[1];
-        double &ySlope = aorg[2];
-        double &yAmpli = aorg[3];
-        double &yScale = aorg[4];
-        double &yShift = aorg[5];
-        
-        //double &mScale = aorg[4]; //!< same scaling
-        //double &mShift = aorg[5]; //!< same shift
-        
-        double &mStart = aorg[6]; //!< start
-        double &mSlope = aorg[7];
-        double &mAmpli = aorg[8];
 
-        
-        // link global to local
-        pY->connect(1, 1);
-        pY->connect(2, 2);
-        pY->connect(3, 3);
-        pY->connect(4, 4);
-        pY->connect(5, 5);
+        double &uStart = aorg[1];
+        double &uSlope = aorg[2];
+        double &uAmpli = aorg[3];
+        double &uCoeff = aorg[4];
+        double &uShift = aorg[5];
 
-        
-        pM->connect(1,6);
-        pM->connect(2,7);
-        pM->connect(3,8);
-        pM->connect(4,4);
-        pM->connect(5,5);
-        
-        // initialize values
-        yStart = _yLeft;
-        ySlope = _ySlope;
-        yAmpli = (yStart + xmin * ySlope) - yy[imin];
-        yScale = 1;
-        yShift = xmin;
-        
-        mStart = _mLeft;
-        mSlope = _mSlope;
-        mAmpli = (mStart+xmin*mSlope) - ym[imin];
-        
+        uStart = yu[1];
+        uSlope = (yu[n]-yu[1])/(xx[n]-xx[1]);
+        uAmpli = (uStart+xmin*uSlope) - yu[xmin];
+        uCoeff = 1;
+        uShift = xmin;
+
+        su->connect(1,1);
+        su->connect(2,2);
+        su->connect(3,3);
+        su->connect(4,4);
+        su->connect(5,5);
+
+
+        double       &dStart = aorg[6];
+        double       &dSlope = aorg[7];
+        double       &dAmpli = aorg[8];
+        //const double &dCoeff = uCoeff;
+        //const double &dShift = uShift;
+
+        dStart = yd[1];
+        dSlope = (yd[n]-yd[1])/(xx[n]-xx[1]);
+        dAmpli = (dStart+xmin*dSlope) - yd[xmin];
+
+        sd->connect(1,6);
+        sd->connect(2,7);
+        sd->connect(3,8);
+        sd->connect(4,4);
+        sd->connect(5,5);
+
+
         vector<bool>   used(gvar,false);
-        vector<double> aerr(gvar);
-        used[3] = true;
-        used[4] = true;
-        used[5] = true;
-        
+        vector<double> aerr(gvar,0);
 
+        // Level 1: adjust scaling
         std::cerr << "LEVEL 1" << std::endl;
+        used[4] = true;
         if(!Fit(samples,F,aorg,used,aerr,&cb))
         {
-            std::cerr << "Couldn't Fit Level-1" << std::endl;
+            std::cerr << "Couldn't fit Level-1" << std::endl;
+            continue;
         }
-        
         Fit.display(std::cerr, aorg, aerr);
+
         {
             ios::wcstream fp("f1.dat");
             for(size_t i=1;i<=n;++i)
             {
-                 fp("%g %g %g %g %g\n", xx[i], yy[i], ym[i], fy[i], fm[i]);
+                fp("%g %g %g\n", xx[i], fd[i], fu[i]);
             }
         }
 
-        for(size_t i=1;i<=gvar;++i) used[i] = true;
-
+        // Level 2: adjust bumps
+        std::cerr << "LEVEL 2" << std::endl;
+        used[3] = true;
+        used[5] = true;
+        used[8] = true;
 
         if(!Fit(samples,F,aorg,used,aerr,&cb))
         {
-            std::cerr << "Couldn't Fit Level-2" << std::endl;
+            std::cerr << "Couldn't fit Level-2" << std::endl;
+            continue;
         }
-
-        std::cerr << "LEVEL 2" << std::endl;
         Fit.display(std::cerr, aorg, aerr);
         {
             ios::wcstream fp("f2.dat");
             for(size_t i=1;i<=n;++i)
             {
-                fp("%g %g %g %g %g\n", xx[i], yy[i], ym[i], fy[i], fm[i]);
+                fp("%g %g %g\n", xx[i], fd[i], fu[i]);
             }
         }
 
+        // Level 3: full fit
+        std::cerr << "LEVEL 3" << std::endl;
+        tao::ld(used, true);
+        if(!Fit(samples,F,aorg,used,aerr,&cb))
+        {
+            std::cerr << "Couldn't fit Level-3" << std::endl;
+            continue;
+        }
+        Fit.display(std::cerr, aorg, aerr);
+        {
+            ios::wcstream fp("f3.dat");
+            for(size_t i=1;i<=n;++i)
+            {
+                fp("%g %g %g\n", xx[i], fd[i], fu[i]);
+            }
+        }
+
+        surf.copy(source);
+        for(size_t i=1;i<=n;++i)
+        {
+            const unit_t x(xx[i]);
+            const unit_t d(Floor(fd[i]+0.5));
+            const unit_t u(Floor(fu[i]+0.5));
+            surf[d][x] = named_color::get("magenta");
+            surf[u][x] = named_color::get("orange");
+        }
+        PNG.save("sfit.png",surf,NULL);
 
     }
-    
+
 }
 YOCTO_PROGRAM_END()
