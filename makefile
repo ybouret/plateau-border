@@ -3,8 +3,7 @@ CREATE=./create.sh
 all:
 
 clean:
-	@echo "-- removing sdk" && rm -Rf sdk
-	@echo "-- removing temporary files" && rm -f *.jpg *.dat *.ppm *.vtk *.png *.dot *.bin *.curve *.silo *.raw image*.*
+	@echo "-- removing temporary files" && rm -f *.jpg *.dat *.ppm *.vtk *.png *.dot *.bin *.curve *.silo *.raw image*.* fit.log
 	@echo "-- cleaning auxiliary files"
 
 ifdef WINDIR

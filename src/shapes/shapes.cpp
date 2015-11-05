@@ -63,6 +63,8 @@ YOCTO_PROGRAM_START()
     histogram          H;
     histogram::patches hp;
 
+    ios::ocstream::overwrite("scaling.dat");
+
     for(int arg=1;arg<argc;++arg)
     {
         const string  filename = argv[arg];
@@ -306,8 +308,33 @@ YOCTO_PROGRAM_START()
             surf[d][x] = named_color::get("magenta");
             surf[u][x] = named_color::get("orange");
         }
-        PNG.save("sfit.png",surf,NULL);
 
+        string outname = vfs::get_base_name(filename);
+        vfs::change_extension(outname, "png");
+        outname = "fit_" + outname;
+        std::cerr << "Saving in " << outname << std::endl;
+        PNG.save(outname,surf,NULL);
+
+        // find the location of it
+        const double xshift     = uShift;
+        const double squeeze    = fabs(uAmpli) + fabs(dAmpli);
+        const double thickness  = (uStart+xshift*uSlope) - (dStart+xshift*dSlope);
+        std::cerr << "thickness =" << thickness << std::endl;
+        std::cerr << "squeeze   =" << squeeze   << std::endl;
+        if(squeeze>=thickness)
+        {
+            std::cerr << "invalid shape!" << std::endl;
+            continue;
+        }
+        const double  am = (thickness-squeeze)/thickness;
+        std::cerr << "am=" << am << std::endl;
+        const double scaling = fabs(uCoeff) * thickness;
+        std::cerr << "scaling=" << scaling << std::endl;
+        {
+            ios::acstream fp("scaling.dat");
+            fp("#%s\n", outname.c_str());
+            fp("%g %g\n", am, scaling);
+        }
     }
 
 }
