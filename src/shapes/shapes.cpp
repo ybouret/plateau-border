@@ -233,6 +233,14 @@ YOCTO_PROGRAM_START()
 
         vector<bool>   used(gvar,false);
         vector<double> aerr(gvar,0);
+        Fit(samples,F,aorg,used,aerr,&cb);
+        {
+            ios::wcstream fp("f0.dat");
+            for(size_t i=1;i<=n;++i)
+            {
+                fp("%g %g %g\n", xx[i], fd[i], fu[i]);
+            }
+        }
 
         // Level 1: adjust scaling
         std::cerr << "LEVEL 1" << std::endl;
