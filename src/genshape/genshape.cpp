@@ -126,7 +126,7 @@ void generate_arche(const double R, vector<vertex> &v, const double z)
 
 
 
-double am    = 0.6;
+double am    = 0.5;
 double scale = 1;
 
 YOCTO_PROGRAM_START()
@@ -157,7 +157,7 @@ YOCTO_PROGRAM_START()
 
 
     const size_t nr = points_per_arch();
-    const size_t nz = 100;
+    const size_t nz = 200;
 
     const double Lz = 3.0;
     const vertex inside(0,0,0);
