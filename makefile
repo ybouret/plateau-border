@@ -14,6 +14,7 @@ endif
 
 preclean:
 	@echo "-- removing out of sources builds" && cd forge && touch targets &&  ( ( cat targets | xargs rm -rf ) && rm -f targets )
+	@echo "-- removing local install" & rm -Rf bin
 
 veryclean: preclean clean
 

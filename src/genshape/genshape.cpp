@@ -6,13 +6,23 @@
 
 #include "yocto/ios/ocstream.hpp"
 #include "yocto/sequence/vector.hpp"
+#include "yocto/container/matrix.hpp"
+#include "yocto/spade/format/stl.hpp"
 
 using namespace yocto;
 using namespace math;
+using namespace spade;
 
 static const double beta  = 120.0;
 static const double alpha = 180.0 - beta;
 static size_t       n     = 20;
+
+
+static inline
+size_t points_per_arch()
+{
+    return 3*n;
+}
 
 static inline double compute_delta(double R)
 {
@@ -82,6 +92,7 @@ void generate_arche(const double R, vector<vertex> &v, const double z)
         vertex u;
         u.x =  r.x * cb + r.y*sb;
         u.y = -r.x * sb + r.y*cb;
+        u.z = z;
         v.push_back(u);
     }
 
@@ -103,6 +114,7 @@ void generate_arche(const double R, vector<vertex> &v, const double z)
         vertex u;
         u.x =  r.x * cb + r.y*sb;
         u.y = -r.x * sb + r.y*cb;
+        u.z = z;
         v.push_back(u);
     }
 
@@ -122,6 +134,7 @@ YOCTO_PROGRAM_START()
 
     compute_centers(1.0, C1, C2, C3);
 
+
     {
         ios::wcstream fp("centers.dat");
         fp("%g %g\n", C1.x, C1.y );
@@ -139,7 +152,46 @@ YOCTO_PROGRAM_START()
         }
         fp("%g %g\n", v[1].x, v[1].y);
     }
+    std::cerr << "#v=" << v.size() << std::endl;
 
+
+    const size_t nr = points_per_arch();
+    const size_t nz = 10;
+
+    const double Lz = 3.0;
+    const vertex inside(0,0,0);
+    const vertex bot(0,0,-Lz);
+    const vertex top(0,0,Lz);
+
+    matrix<vertex> shape(nz,nr);
+    for(size_t i=1;i<=nz;++i)
+    {
+        const double z = -Lz + ((2.0*Lz)*(i-1))/double(nz-1);
+        v.free();
+        generate_arche(1.0,v,z);
+        assert(v.size()==nr);
+        for(size_t j=1;j<=nr;++j)
+        {
+            shape[i][j] = v[j];
+        }
+    }
+
+    typedef stl::facet<double> facet_t;
+
+    vector<facet_t> facets;
+
+    stl::close_contour(facets, shape[1], bot, inside);
+
+    for(size_t i=1;i<nz;++i)
+    {
+        stl::make_ribbon(facets, shape[i], shape[i+1], inside);
+    }
+
+    stl::close_contour(facets, shape[nz], top, inside);
+    {
+        ios::wcstream fp("shape.stl");
+        stl::save_binary(fp,facets);
+    }
 
 }
 YOCTO_PROGRAM_END()
