@@ -10,6 +10,7 @@
 #include "yocto/spade/format/stl.hpp"
 #include "yocto/graphics/image/png.hpp"
 #include "yocto/graphics/ops/blend.hpp"
+#include "yocto/fs/local-fs.hpp"
 
 using namespace yocto;
 using namespace math;
@@ -137,6 +138,13 @@ YOCTO_PROGRAM_START()
     graphics::image::format *PNG = new graphics::png_format();
     IMG.declare(PNG);
 
+    vfs &fs = local_fs::instance();
+    string outdir = "tmp";
+    fs.as_directory(outdir);
+    fs.create_sub_dir(outdir);
+    fs.remove_files_with_extension_in(outdir, "png");
+
+
     double       Z  = 200;
     const size_t nz = ceil(Z);
     Z = nz;
@@ -161,9 +169,17 @@ YOCTO_PROGRAM_START()
     typedef stl::facet<double> facet_t;
     vector<facet_t> facets;
 
+    const graphics::RGB bg(200,200,200);
+
     for(int ai=0;ai<=180;ai+=15)
     {
-        surf.ldz();
+        for(unit_t j=0;j<surf.h;++j)
+        {
+            for(unit_t i=0;i<surf.w;++i)
+            {
+                surf[j][i] = bg;
+            }
+        }
         const double theta = Deg2Rad(double(ai));
         for(size_t i=1;i<=nz;++i)
         {
@@ -207,7 +223,7 @@ YOCTO_PROGRAM_START()
         {
             stl::make_ribbon(facets, shape[i], shape[i+1], inside);
         }
-        const graphics::RGB  c(200,200,210);
+        const graphics::RGB  c(100,0,0);
         const uint8_t        a = 255;
 
         const size_t nf = facets.size();
@@ -224,7 +240,10 @@ YOCTO_PROGRAM_START()
             }
         }
 
-        const string filename = vformat("shape%03d.png",ai);
+        const string filename = outdir+vformat("shape%03d.png",ai);
+
+
+
         PNG->save(filename,surf,NULL);
     }
 
