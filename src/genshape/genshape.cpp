@@ -8,6 +8,8 @@
 #include "yocto/sequence/vector.hpp"
 #include "yocto/container/matrix.hpp"
 #include "yocto/spade/format/stl.hpp"
+#include "yocto/graphics/image/png.hpp"
+#include "yocto/graphics/ops/blend.hpp"
 
 using namespace yocto;
 using namespace math;
@@ -126,11 +128,102 @@ void generate_arche(const double R, vector<vertex> &v, const double z)
 
 
 
-double am    = 0.5;
-double scale = 1;
+
 
 YOCTO_PROGRAM_START()
 {
+
+    graphics::image         &IMG = graphics::image::instance();
+    graphics::image::format *PNG = new graphics::png_format();
+    IMG.declare(PNG);
+
+    double       Z  = 200;
+    const size_t nz = ceil(Z);
+    Z = nz;
+    const double Zc = Z/2;
+    double R0 = 50;
+    double Y  = ceil(R0*2);
+    const size_t ny = Y;
+    Y = ny;
+    const size_t Yc = Y/2;
+
+    double theta  = 0.0; // rotation
+    double lambda = 4.0;
+    double am     = 0.5;
+
+    const size_t nr = points_per_arch();
+
+    graphics::pixmap3 surf(Z,Y);
+
+    matrix<vertex> shape(nz,nr);
+    vector<vertex> v;
+
+    for(size_t i=1;i<=nz;++i)
+    {
+        const double z = double(i-1)*Z/double(nz-1);
+        const double R = 1.0 - (1.0-am)/Square( cosh(lambda*((z-Zc)/R0)) );
+        v.free();
+        generate_arche(R*R0,v, z);
+
+        for(size_t j=1;j<=nr;++j)
+        {
+
+            // rotation
+            vertex p  = geo::rotate(v[j], theta);
+
+            // translation
+            p.y +=  Yc;
+            shape[i][j] = p;
+        }
+    }
+
+    typedef stl::facet<double> facet_t;
+
+    vector<facet_t> facets;
+
+    const vertex inside(0,Yc,Zc);
+    const vertex bot(0,Yc,0);
+    const vertex top(0,Yc,Zc);
+
+    stl::close_contour(facets, shape[1], bot, inside);
+
+    for(size_t i=1;i<nz;++i)
+    {
+        stl::make_ribbon(facets, shape[i], shape[i+1], inside);
+    }
+
+    stl::close_contour(facets, shape[nz], top, inside);
+    {
+        ios::wcstream fp("shape.stl");
+        stl::save_binary(fp,facets);
+    }
+
+    facets.free();
+    //! project facets
+    for(size_t i=1;i<nz;++i)
+    {
+        stl::make_ribbon(facets, shape[i], shape[i+1], inside);
+    }
+    const graphics::RGB  c(255,0,0);
+    const uint8_t        a = 127;
+
+    const size_t nf = facets.size();
+    std::cerr << "projecting " << nf << " facets" << std::endl;
+    for(size_t k=1;k<=nf;++k)
+    {
+        const facet_t &f = facets[k];
+        const vertex   g = ( (*f.v1) + (*f.v2) + (*f.v3) )/3.0;
+        const size_t   i = size_t(g.z);
+        const size_t   j = size_t(g.y);
+        if(i<nz&&j<ny)
+        {
+            surf[j][i] = graphics::blend::mix(surf[j][i],c,a);
+        }
+    }
+
+    PNG->save("shape.png",surf,NULL);
+
+#if 0
     vertex C1,C2,C3;
 
     compute_centers(1.0, C1, C2, C3);
@@ -194,6 +287,7 @@ YOCTO_PROGRAM_START()
         ios::wcstream fp("shape.stl");
         stl::save_binary(fp,facets);
     }
+#endif
 
 }
 YOCTO_PROGRAM_END()
