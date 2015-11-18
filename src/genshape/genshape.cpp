@@ -206,7 +206,7 @@ YOCTO_PROGRAM_START()
         stl::make_ribbon(facets, shape[i], shape[i+1], inside);
     }
     const graphics::RGB  c(255,0,0);
-    const uint8_t        a = 127;
+    const uint8_t        a = 200;
 
     const size_t nf = facets.size();
     std::cerr << "projecting " << nf << " facets" << std::endl;
@@ -223,6 +223,8 @@ YOCTO_PROGRAM_START()
     }
 
     PNG->save("shape.png",surf,NULL);
+
+    
 
 #if 0
     vertex C1,C2,C3;
