@@ -150,14 +150,14 @@ YOCTO_PROGRAM_START()
     Z = nz;
     const double Zc = Z/2;
     double R0 = 50;
-    n         = ceil(R0);
     double Y  = ceil(R0*2);
+    n         = ceil(R0*1.2);
     const size_t ny = Y;
     Y = ny;
     const size_t Yc = Y/2;
 
-    double lambda = 3.0;
-    double am     = 0.5;
+    double lambda = 2.0;
+    double am     = 0.8;
 
     const size_t nr = points_per_arch();
 
@@ -183,7 +183,7 @@ YOCTO_PROGRAM_START()
         const double theta = Deg2Rad(double(ai));
         for(size_t i=1;i<=nz;++i)
         {
-            const double z = double(i-1)*Z/double(nz-1);
+            const double z = i-1;
             const double R = 1.0 - (1.0-am)/Square( cosh(lambda*((z-Zc)/R0)) );
             v.free();
             generate_arche(R*R0,v, z);
@@ -226,6 +226,7 @@ YOCTO_PROGRAM_START()
         const graphics::RGB  c(100,0,0);
         const uint8_t        a = 255;
 
+#if 0
         const size_t nf = facets.size();
         std::cerr << "projecting " << nf << " facets" << std::endl;
         for(size_t k=1;k<=nf;++k)
@@ -239,6 +240,20 @@ YOCTO_PROGRAM_START()
                 surf[j][i] = graphics::blend::mix(surf[j][i],c,a);
             }
         }
+#endif
+
+        std::cerr << "projecting " << shape.items << " vertices" << std::endl;
+        for(size_t k=0;k<shape.items;++k)
+        {
+            const vertex  &g = shape.fetch(k);
+            const size_t   i = size_t(floor(g.z+0.5));
+            const size_t   j = size_t(floor(g.y+0.5));
+            if(i<nz&&j<ny)
+            {
+                surf[j][i] = graphics::blend::mix(surf[j][i],c,a);
+            }
+        }
+
 
         const string filename = outdir+vformat("shape%03d.png",ai);
 

@@ -335,7 +335,7 @@ YOCTO_PROGRAM_START()
         {
             ios::acstream fp("scaling.dat");
             fp("#%s\n", outname.c_str());
-            fp("%g %g %g\n", am, scaling, beta);
+            fp("%d %g %g %g\n", arg-1, am, scaling, beta);
         }
 
     }
