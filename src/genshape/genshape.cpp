@@ -142,6 +142,7 @@ YOCTO_PROGRAM_START()
     Z = nz;
     const double Zc = Z/2;
     double R0 = 50;
+    n         = ceil(R0);
     double Y  = ceil(R0*2);
     const size_t ny = Y;
     Y = ny;
