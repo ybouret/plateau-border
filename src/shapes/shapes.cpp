@@ -8,7 +8,8 @@
 #include "yocto/program.hpp"
 #include "yocto/ios/ocstream.hpp"
 #include "yocto/math/fit/lsf.hpp"
-
+#include "yocto/math/types.hpp"
+#include "yocto/math/trigconv.hpp"
 
 using namespace yocto;
 using namespace graphics;
@@ -326,6 +327,7 @@ YOCTO_PROGRAM_START()
             std::cerr << "invalid shape!" << std::endl;
             continue;
         }
+#if 0
         const double am      = (thickness-squeeze)/thickness;
         const double scaling = fabs(uCoeff) * thickness;
         const double beta    = (1.0-am)/(4*scaling*scaling);
@@ -337,6 +339,27 @@ YOCTO_PROGRAM_START()
             fp("#%s\n", outname.c_str());
             fp("%d %g %g %g %g\n", arg-1, am, scaling, beta, thickness);
         }
+#endif
+
+        // find the possible rotation angle
+        const double uDelta = Fabs(uAmpli);
+        const double dDelta = Fabs(dAmpli);
+        const double ratio  = uDelta/dDelta;
+        const double tt     = (ratio-0.5)/(sqrt(3.0)/2);
+        const double theta  = max_of<double>(Atan(tt),0);
+
+        // deduce the geometrical radius
+        const double R      = sqrt(3.0) * thickness / (Cos(theta)+Sin(numeric<double>::pi/6+theta));
+
+        // find the max amplitude
+        const double am      = (thickness-squeeze)/thickness;
+        const double scaling = fabs(uCoeff) * R;
+        {
+            ios::acstream fp("scaling.dat");
+            fp("#%s\n", outname.c_str());
+            fp("%d %g %g %g %g\n", arg-1, Rad2Deg(theta), R, am, scaling);
+        }
+
 
     }
 

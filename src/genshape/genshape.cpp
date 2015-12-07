@@ -171,7 +171,7 @@ YOCTO_PROGRAM_START()
 
     const graphics::RGB bg(200,200,200);
 
-    for(int ai=0;ai<=180;ai+=15)
+    for(int ai=0;ai<=45;ai+=5)
     {
         for(unit_t j=0;j<surf.h;++j)
         {
