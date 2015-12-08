@@ -66,6 +66,11 @@ YOCTO_PROGRAM_START()
 
     ios::ocstream::overwrite("scaling.dat");
 
+    const RGB blue    = named_color::get("blue");
+    const RGB red     = named_color::get("red");
+    const RGB magenta = named_color::get("magenta");
+    const RGB orange  = named_color::get("orange");
+
     for(int arg=1;arg<argc;++arg)
     {
         const string  filename = argv[arg];
@@ -127,7 +132,7 @@ YOCTO_PROGRAM_START()
                 }
             }
 
-            surf[jmin][i] = named_color::get("red");
+            surf[jmin][i] = red;
 
             unit_t jmax = h-1;
             for(unit_t j=h-1;j>=0;--j)
@@ -138,7 +143,7 @@ YOCTO_PROGRAM_START()
                     break;
                 }
             }
-            surf[jmax][i] = named_color::get("blue");
+            surf[jmax][i] = blue;
 
             yd.push_back(jmin);
             yu.push_back(jmax);
@@ -306,8 +311,8 @@ YOCTO_PROGRAM_START()
             const unit_t x(xx[i]);
             const unit_t d(Floor(fd[i]+0.5));
             const unit_t u(Floor(fu[i]+0.5));
-            surf[d][x] = named_color::get("magenta");
-            surf[u][x] = named_color::get("orange");
+            surf[d][x] = magenta;
+            surf[u][x] = orange;
         }
 
         string outname = vfs::get_base_name(filename);
@@ -354,10 +359,12 @@ YOCTO_PROGRAM_START()
         // find the max amplitude
         const double am      = (thickness-squeeze)/thickness;
         const double scaling = fabs(uCoeff) * R;
+        const double beta    = (1.0-am)/(4*scaling*scaling);
         {
             ios::acstream fp("scaling.dat");
             fp("#%s\n", outname.c_str());
-            fp("%d %g %g %g %g\n", arg-1, Rad2Deg(theta), R, am, scaling);
+            fp("#num theta R am scaling beta\n");
+            fp("%d %g %g %g %g %g\n", arg-1, Rad2Deg(theta), R, am, scaling, beta);
         }
 
 
