@@ -177,7 +177,7 @@ YOCTO_PROGRAM_START()
         outname = vfs::get_base_name(filename);
         vfs::change_extension(outname, "dat");
         outname = "profile_" + outname;
-        std::cerr << "Saving in " << outname << std::endl;
+        std::cerr << "Saving Profile in " << outname << std::endl;
         {
             ios::wcstream fp(outname);
             for(size_t i=1;i<=n;++i)
@@ -264,10 +264,10 @@ YOCTO_PROGRAM_START()
             assert(ir<=n);
 
             const double hw = xx[ir]-xx[il];
-            std::cerr << "hw=" << hw << std::endl;
             scale = 2.0/max_of<double>(hw,1);
         }
 
+#if 1
         (void)sample.computeD2(F,aorg);
         {
             ios::wcstream fp("f0.dat");
@@ -276,6 +276,8 @@ YOCTO_PROGRAM_START()
                 fp("%g %g\n", xx[i], fa[i]);
             }
         }
+#endif
+
 
         used[1] = used[2] = used[3] = used[4] = used[5] = true;
         if( ! samples.fit_with(F, aorg, used, aerr ) )
@@ -293,44 +295,38 @@ YOCTO_PROGRAM_START()
         }
 
 
-
-#if 0
         //______________________________________________________________________
         //
-        // analyze
+        // saving data
         //______________________________________________________________________
-        const size_t n      = w;
-
-
-        size_t imin= 1;
-        double vmin= ya[1];
-        for(size_t i=2;i<=n;++i)
+        outname = vfs::get_base_name(filename);
+        vfs::change_extension(outname, "dat");
+        outname = "thickness_" + outname;
+        std::cerr << "Saving thickness in " << outname << std::endl;
         {
-            const double tmp = ya[i];
-            if(tmp<vmin)
-            {
-                imin = i;
-                vmin = tmp;
-            }
-        }
-        const double xmin = xx[imin];
-
-        {
-            ios::wcstream fp("profile.dat");
+            ios::wcstream fp(outname);
             for(size_t i=1;i<=n;++i)
             {
-                fp("%g %g %g\n", xx[i], yd[i], yu[i]);
+                const double x = xx[i];
+                const double ybase = start+x*slope;
+                fp("%g %g %g\n", x, ya[i]-ybase, fa[i]-ybase);
             }
         }
-        
-        string outname = vfs::get_base_name(filename);
-        vfs::change_extension(outname, "png");
-        outname = "fit_" + outname;
-        std::cerr << "Saving in " << outname << std::endl;
-        PNG.save(outname,surf,NULL);
-#endif
-        
-        
+
+
+        //______________________________________________________________________
+        //
+        // processing data
+        //______________________________________________________________________
+        const double Ep     = start+xmin*slope;
+        const double Em     = Ep - ampli;
+        const double am     = Em/Ep;
+        std::cerr << "am=" << am << std::endl;
+        const double Rp     = 1.08 * Ep;
+        const double Lambda = Rp * scale;
+        const double beta   = (1.0-am)/(4*Lambda*Lambda);
+        std::cerr << "beta=" << beta << std::endl;
+
     }
     
 }
